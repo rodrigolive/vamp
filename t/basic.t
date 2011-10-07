@@ -6,8 +6,9 @@ use YAML;
 
 use Vamp;
 #my $db = Vamp->connect(db=>'vamp', args=>"dbi:SQLite:dbname=:memory:" );
-my $db = Vamp->connect(db=>'vamp', args=>'dbi:SQLite:test.db' );
+#my $db = Vamp->connect(db=>'vamp', args=>'dbi:SQLite:test.db' );
 #my $db = Vamp->connect(db=>'vamp', args=>['dbi:Oracle://localhost:1521/SCM','gbp','gbp']  );
+my $db = Vamp->connect(db=>'vamp', args=>['dbi:Oracle://orades:1550/ddboltp.gbp','uharvest','uharvest']  );
 $db->recreate;
 my $coll = $db->collection('person');
 $coll->drop;
@@ -37,9 +38,10 @@ $coll->insert({ name=>'listy', age=>20, belongings=>[qw/house car boat/] });
     $coll->insert({ name=>{ first=>'bob', last=>'baz'}, age=>75, family=>{ kids=>['kyle','lucy'] } });
     $coll->insert({ name=>{ first=>'helen', last=>'baz'}, age=>71 });
     my $objs = $coll->find({ name=>{ last=>'baz' } });
-    #warn Dump $objs;
-    is $objs->first->{name}->{first}, 'bob', 'hash deep find';
-    is_deeply $objs->first->{family}->{kids}, ['kyle', 'lucy'], 'arr deep find';
+    my $row = $objs->first;
+    warn Dump $row;
+    is $row->{name}->{first}, 'bob', 'hash deep find';
+    is_deeply $row->{family}->{kids}, ['kyle', 'lucy'], 'arr deep find';
 }
 use Benchmark;
 my $k = 0;

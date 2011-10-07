@@ -1,6 +1,5 @@
 package Vamp::Backend::Oracle;
-use strict;
-use warnings;
+use Mouse;
 use Try::Tiny;
 use DBD::Oracle qw(:ora_types);
 use base 'Vamp::Database';
@@ -66,12 +65,20 @@ sub query_findall {
     }
     my $from = join ' INTERSECT ', @sqls;
     my $sql = "SELECT DISTINCT oid FROM ( $from ) vamp2 WHERE vamp1.oid = vamp2.oid ";
-    #warn $sql;
     $sql = "SELECT oid,key,value FROM ${db_name}_kv vamp1 WHERE EXISTS ( $sql ) ORDER BY vamp1.oid"; 
+    #warn $sql;
     #warn Dump $self->query( $sql, @all_binds )->hashes;
     $self->query( $sql, @all_binds );
 }
 
+around '_abstract' => sub {
+    my $orig = shift;
+    my $self = shift;
+    my ($where, @binds ) = $self->$orig( @_ );
+    # oracle needs this for clobs:
+    $where =~ s{value =}{value LIKE}g;
+    ( $where, @binds );
+};
 
 sub deploy { 
     my $self = shift;
