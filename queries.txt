@@ -1,0 +1,65 @@
+SELECT key,value FROM vamp_kv kv1
+WHERE EXISTS ( 
+    SELECT OID FROM (
+            SELECT oid FROM vamp_kv WHERE key='nombre' AND value='jack'
+        INTERSECT
+            SELECT oid FROM vamp_kv WHERE key='edad' AND value=20
+    ) kv2 WHERE kv2.oid = kv1.oid
+)
+ORDER BY oid
+
+SELECT oid, key,value FROM vamp_kv kv1
+WHERE EXISTS ( 
+    SELECT OID FROM (
+            SELECT oid FROM vamp_kv WHERE key='name' AND value like 'j%'
+        INTERSECT
+            SELECT oid FROM vamp_kv WHERE key='age' AND value>=20
+    ) kv2 WHERE kv2.oid = kv1.oid
+)
+ORDER BY oid
+
+SELECT oid,key,value FROM vamp_kv kv0
+WHERE kv0.oid IN (
+
+SELECT kv0.oid,kv0.key,kv0.value FROM vamp_kv kv0, (
+    SELECT oid FROM vamp_kv kv1
+    WHERE EXISTS ( 
+        SELECT OID FROM (
+                SELECT oid FROM vamp_kv WHERE key='name' AND value like 'j%'
+            INTERSECT
+                SELECT oid FROM vamp_kv WHERE key='age' AND value>=20
+        ) kv2 WHERE kv2.oid = kv1.oid
+    )
+    AND key = 'age'
+    ORDER BY value DESC
+) kvx
+WHERE kv0.oid = kvx.oid
+
+SELECT oid, (SELECT key,value FROM vamp_kv kv1)
+WHERE EXISTS ( 
+    SELECT OID FROM (
+            SELECT oid FROM vamp_kv WHERE key='name' AND value like 'j%'
+        INTERSECT
+            SELECT oid FROM vamp_kv WHERE key='age' AND value>=20
+    ) kv2 WHERE kv2.oid = kv1.oid
+)
+AND key = 'age'
+ORDER BY value DESC
+
+$coll->insert({ id_job=>23, msg=>'kdjfkdjf', data=>
+$coll->index(qw/msg id/)
+
+SELECT kv0.oid,kv0.key,kv0.value FROM vamp_kv kv0, (
+    SELECT oid FROM vamp_kv kv1
+    WHERE EXISTS ( 
+        SELECT OID FROM (
+                SELECT oid FROM vamp_kv WHERE key='name' AND UTL_RAW.CAST_TO_VARCHAR2(RAWTOHEX(DBMS_LOB.SUBSTR(value, 2000, 1))) like 'me%'
+            INTERSECT
+                SELECT oid FROM vamp_kv WHERE key='age' AND UTL_RAW.CAST_TO_VARCHAR2(RAWTOHEX(DBMS_LOB.SUBSTR(value, 2000, 1)))>=20
+        ) kv2 WHERE kv2.oid = kv1.oid
+    )
+    AND key = 'age'
+    ORDER BY TO_NUMBER(UTL_RAW.CAST_TO_VARCHAR2(RAWTOHEX(DBMS_LOB.SUBSTR(value, 2000, 1)))) DESC
+) kvx
+WHERE kv0.oid = kvx.oid
+
