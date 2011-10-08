@@ -23,16 +23,7 @@ sub query_find_id {
     my ($self, %args) = @_;
     my $db_name = $self->{db_name};
     my $query = "select distinct ${db_name}_obj.id from ${db_name}_obj, ${db_name}_kv
-        where ${db_name}_obj.id=${db_name}_kv.oid and key = ? ";
-    # truncate the data in chunks 
-    my @parts = unpack '(a2000)*', $args{v};
-    for my $idx (0..$#parts) {
-          $query .= sprintf (
-            ' AND UTL_RAW.CAST_TO_VARCHAR2(RAWTOHEX(DBMS_LOB.SUBSTR(value, 2000, %d))) = ?',
-            ($idx*2000 + 1)
-          );
-    }
-    
+        where ${db_name}_obj.id=${db_name}_kv.oid and key = ? and value like ?";
     my $sth = $self->dbh->prepare( $query ); 
     my $st = bless {
         db    => "$self",
@@ -42,9 +33,7 @@ sub query_find_id {
     $__PACKAGE__::statements{$self}{$st} = $st;
     
     $sth->bind_param(1, $args{k} );
-    for my $idx (0..$#parts) {
-        $sth->bind_param(2 + $idx, $parts[$idx], { dbd_attrs=>undef } );
-    }
+    $sth->bind_param(2, $args{v} );
     $sth->execute;
     return bless { st => $st, lc_columns => $self->{lc_columns} }, $self->{result_class};
 }
@@ -65,13 +54,13 @@ sub query_findall {
     }
     my $from = join ' INTERSECT ', @sqls;
     my $sql = "SELECT DISTINCT oid FROM ( $from ) vamp2 WHERE vamp1.oid = vamp2.oid ";
-    $sql = "SELECT oid,key,value FROM ${db_name}_kv vamp1 WHERE EXISTS ( $sql ) ORDER BY vamp1.oid"; 
-    #warn $sql;
+    $sql = "SELECT oid,key,value,datatype FROM ${db_name}_kv vamp1 WHERE EXISTS ( $sql ) ORDER BY vamp1.oid"; 
+    warn $sql;
     #warn Dump $self->query( $sql, @all_binds )->hashes;
     $self->query( $sql, @all_binds );
 }
 
-around '_abstract' => sub {
+around _abstract => sub {
     my $orig = shift;
     my $self = shift;
     my ($where, @binds ) = $self->$orig( @_ );

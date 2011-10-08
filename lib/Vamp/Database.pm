@@ -1,9 +1,15 @@
+=pod
+
+Base class for all backends.
+
+=cut
 package Vamp::Database;
 #use Mouse;
 use strict;
 use Vamp::Collection;
 use Try::Tiny;
 use Vamp::Util;
+use Vamp::ResultSet;
 use YAML;
 use base 'DBIx::Simple' ;
 
@@ -144,83 +150,6 @@ sub _abstract {
     #warn $where;
     #warn join ',',@binds;
     return $where, @binds;
-}
-
-package Vamp::ResultSet;
-use strict;
-use warnings;
-use base 'DBIx::Simple::Result';
-
-sub all {
-    my $self = shift;
-    my @rows;
-    my @ret;
-    my $lastid;
-    for my $r ( $self->hashes ) {
-        my $oid = $r->{oid};
-        if( defined $lastid && $oid != $lastid ) {
-            push @ret, $self->_inflate_row( @rows ); 
-            @rows = ();
-        } 
-        push @rows, $r; 
-        $lastid = $oid;
-    }
-    @rows and push @ret, $self->_inflate_row( @rows );
-    return @ret;
-}
-
-sub first {
-    my $self = shift;
-    my $obj = $self->next;
-    defined $obj ? $obj : {};
-}
-
-sub next {
-    my $self = shift;
-    my @rows;
-    my $lastid = $self->{lastid};
-    push @rows, delete $self->{lastrow} if $self->{lastrow};
-    while( my $r = $self->hash ) {
-        my $oid = $r->{oid};
-        #warn YAML::Dump( $r );
-        if( defined $lastid && $oid != $lastid ) {
-            $self->{lastrow} = $r;
-            $self->{lastid} = $oid;
-            last;
-        } else {
-            push @rows, $r; 
-            $lastid = $oid;
-        }
-    }
-    @rows and return $self->_inflate_row( @rows );
-    return undef;
-}
-
-sub _inflate_row {
-    my $self = shift;
-    my %row;
-    #warn YAML::Dump( \@_ );
-    for( @_ ) {
-        my $oid = $_->{oid};
-        $row{ id } ||= $oid;
-        my @keys = split /\./, $_->{key}; 
-        if( defined $_->{datatype} && $_->{datatype} eq 'a' ) {
-            my $x = $self->_deepen( \%row, @keys );
-            push @{ $$x }, $_->{value}; 
-        } else {
-            my $x = $self->_deepen( \%row, @keys );
-            $$x = $_->{value}; 
-        }
-    }
-    \%row;
-}
-
-sub _deepen {
-    my ($self, $row, @keys) = @_; 
-    my $k = shift @keys;
-    !@keys and return \($row->{$k});
-    $row->{$k} ||= {};
-    $self->_deepen( $row->{$k}, @keys );
 }
 
 1;

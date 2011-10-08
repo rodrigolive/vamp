@@ -5,13 +5,16 @@ use Test::More;
 use YAML;
 
 use Vamp;
-#my $db = Vamp->connect(db=>'vamp', args=>"dbi:SQLite:dbname=:memory:" );
-#my $db = Vamp->connect(db=>'vamp', args=>'dbi:SQLite:test.db' );
-#my $db = Vamp->connect(db=>'vamp', args=>['dbi:Oracle://localhost:1521/SCM','gbp','gbp']  );
-my $db = Vamp->connect(db=>'vamp', args=>['dbi:Oracle://orades:1550/ddboltp.gbp','uharvest','uharvest']  );
+use lib 't';
+use VampTest;
+
+# connect and drop
+my $db = test_db();
 $db->recreate;
 my $coll = $db->collection('person');
 $coll->drop;
+
+# base data
 $coll->insert({ name=>'joe', age=>20 });
 $coll->insert({ name=>'jack', age=>33 });
 $coll->insert({ name=>{ first=>'Susie', last=>'Doe' }, age=>20 });
@@ -43,18 +46,6 @@ $coll->insert({ name=>'listy', age=>20, belongings=>[qw/house car boat/] });
     is $row->{name}->{first}, 'bob', 'hash deep find';
     is_deeply $row->{family}->{kids}, ['kyle', 'lucy'], 'arr deep find';
 }
-use Benchmark;
-my $k = 0;
-timethis( 1000, sub{
-   $coll->insert({ name=>"me" . $k++, age=>$k }); 
-});
-$k = 0;
-timethis( 300, sub{
-   my $r = $coll->find_one({ name=>"me" . $k++ }); 
-   #my $r = $coll->find({ name=>"me" . $k++ })->first;  # ultraslow
-   #is $r->{age}, $k, 'age ok';
-});
-
 {
     my $rs = $coll->query({}, { order_by=>'name', rows=>5 });
 }
