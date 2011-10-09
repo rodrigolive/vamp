@@ -38,26 +38,37 @@ sub query_find_id {
     return bless { st => $st, lc_columns => $self->{lc_columns} }, $self->{result_class};
 }
 
-#TODO turn this into oracle clob syntax
-sub query_findall {
+sub build_query_findall {
     my ($self, $collname, $where ) = @_;
     my $db_name = $self->{db_name};
     my $query_head = "SELECT DISTINCT oid FROM ${db_name}_kv ";
+    my $coll_match = qq{ AND EXISTS ( select 1 from ${db_name}_obj vamp3
+        where vamp3.collection='$collname' and vamp3.id=vamp_kv.oid ) };
     my @sqls;
     my @all_binds;
     my @wh = $self->_flatten( $where );
     for my $wh ( @wh ) {
         my ( $where, @binds ) = $self->_abstract( $wh );
-        my $sql = $query_head . $where;
+        my $sql = $query_head . $where . $coll_match;
         push @sqls,      $sql;
         push @all_binds, @binds;
     }
     my $from = join ' INTERSECT ', @sqls;
     my $sql = "SELECT DISTINCT oid FROM ( $from ) vamp2 WHERE vamp1.oid = vamp2.oid ";
     $sql = "SELECT oid,key,value,datatype FROM ${db_name}_kv vamp1 WHERE EXISTS ( $sql ) ORDER BY vamp1.oid"; 
-    warn $sql;
-    #warn Dump $self->query( $sql, @all_binds )->hashes;
-    $self->query( $sql, @all_binds );
+    ( $sql, @all_binds );
+}
+
+sub query_findall {
+    my $self = shift;
+    $self->query( $self->build_query_findall( @_ ) );
+}
+
+sub query_find_one {
+    my $self = shift;
+    my ( $sql, @binds ) = $self->build_query_findall( @_ );
+    $sql = "SELECT * FROM ( $sql ) WHERE rownum = 1";
+    $self->query( $sql, @binds );
 }
 
 around _abstract => sub {
@@ -67,6 +78,21 @@ around _abstract => sub {
     # oracle needs this for clobs:
     $where =~ s{value =}{value LIKE}g;
     ( $where, @binds );
+};
+
+around drop_database => sub {
+    my $orig = shift;
+    my $self = shift;
+
+    # oracle specific
+    my $db_name = $self->{db_name};
+    eval { $self->query("drop trigger ${db_name}_obj_tr") };
+    eval { $self->query("drop trigger ${db_name}_kv_tr") };
+    eval { $self->query("drop sequence ${db_name}_obj_seq") };
+    eval { $self->query("drop sequence ${db_name}_kv_seq") };
+
+    # drop the rest
+    $self->$orig( @_ );
 };
 
 sub deploy { 
@@ -80,6 +106,15 @@ sub deploy {
             id integer primary key,
             collection varchar(1024)
         )});
+        $self->query("create sequence ${db_name}_obj_seq");
+        $self->query("create trigger ${db_name}_obj_tr
+            BEFORE INSERT ON ${db_name}_obj
+            REFERENCING NEW AS NEW OLD AS OLD
+            FOR EACH ROW
+            BEGIN
+               SELECT ${db_name}_obj_seq.NEXTVAL INTO :NEW.ID FROM dual;
+            END;
+        ");
     };
     try { $self->query("select count(*) from ${db_name}_kv") }
     catch {
@@ -112,15 +147,6 @@ sub deploy {
             foreign key(id2) references ${db_name}_obj(id) on delete cascade
             )
         });
-        $self->query("create sequence ${db_name}_obj_seq");
-        $self->query("create trigger ${db_name}_obj_tr
-            BEFORE INSERT ON ${db_name}_obj
-            REFERENCING NEW AS NEW OLD AS OLD
-            FOR EACH ROW
-            BEGIN
-               SELECT ${db_name}_obj_seq.NEXTVAL INTO :NEW.ID FROM dual;
-            END;
-        ");
     };
     #$self->query("create index $self->{db_name}_values on $self->{db_name}_kv (value)");
 }

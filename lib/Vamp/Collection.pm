@@ -50,17 +50,8 @@ sub find_all {
 
 sub find_one {
     my $self = shift;
-    my $where = ref $_[0] eq 'HASH' ? shift : \%{ @_ };
-    my @oids;
-    my $oid;
-    while( my ($k,$v) = each %$where ) {
-        my $oids = $self->db->query_find_id( k=>$k, v=>$v )->array;
-        next unless defined $oids;
-        $oid = $oids->[0];
-        push @oids, @$oids;
-    }
-    #die join',',@oids;
-    $self->_get( $oid ) if defined $oid;
+    my $rs = $self->find( @_ );
+    $rs->next;
 }
 
 sub _deepen {
@@ -89,6 +80,8 @@ sub _get {
     #warn "=" x 20, Dump \%row;
     \%row;
 }
+
+=pod unused
 
 sub _inflate_row {
     my $self = shift;
@@ -125,6 +118,8 @@ sub _inflate_rows {
     }
     \%row;
 }
+
+=cut
 
 sub _obj {
     my ($self , %args ) = @_;

@@ -6,11 +6,11 @@ Base class for all backends.
 package Vamp::Database;
 #use Mouse;
 use strict;
-use Vamp::Collection;
 use Try::Tiny;
+use YAML; # XXX
 use Vamp::Util;
 use Vamp::ResultSet;
-use YAML;
+use Vamp::Collection;
 use base 'DBIx::Simple' ;
 
 sub collection {
@@ -20,7 +20,7 @@ sub collection {
 
 sub recreate {
     my $self = shift;
-    $self->drop;
+    $self->drop_database;
     $self->deploy;
 }
 
@@ -75,20 +75,21 @@ sub query_find_abs {
 sub query_findall {
     my ($self, $collname, $where ) = @_;
     my $db_name = $self->{db_name};
-    my $query_head = "SELECT DISTINCT oid FROM ${db_name}_kv ";
+    my $query_head = "SELECT DISTINCT oid FROM ${db_name}_kv vamp_kv";
+    my $coll_match = " AND EXISTS ( select 1 from ${db_name}_obj vamp3 where vamp3.collection='$collname' and vamp3.id=vamp_kv.oid ) ";
     my @sqls;
     my @all_binds;
     my @wh = $self->_flatten( $where );
     for my $wh ( @wh ) {
         my ( $where, @binds ) = $self->_abstract( $wh );
-        my $sql = $query_head . $where;
+        my $sql = $query_head . $where . $coll_match;
         push @sqls,      $sql;
         push @all_binds, @binds;
     }
     my $from = join ' INTERSECT ', @sqls;
     my $sql = "SELECT DISTINCT oid FROM ( $from ) vamp2 WHERE vamp1.oid = vamp2.oid ";
     #warn $sql;
-    $sql = "SELECT oid,key,value FROM ${db_name}_kv vamp1 WHERE EXISTS ( $sql ) ORDER BY vamp1.oid"; 
+    $sql = "SELECT oid,key,value,datatype FROM ${db_name}_kv vamp1 WHERE EXISTS ( $sql ) ORDER BY vamp1.oid,id desc"; 
     #warn Dump $self->query( $sql, @all_binds )->hashes;
     $self->query( $sql, @all_binds );
 }
@@ -150,6 +151,17 @@ sub _abstract {
     #warn $where;
     #warn join ',',@binds;
     return $where, @binds;
+}
+
+sub drop_database { 
+    my $self = shift;
+    my $db_name = $self->{db_name};
+    eval { $self->query("drop table ${db_name}_obj cascade constraints") }; 
+    $ENV{VAMP_DEBUG} && $@ and warn $@;
+    eval { $self->query("drop table ${db_name}_kv cascade constraints") };
+    $ENV{VAMP_DEBUG} && $@ and warn $@;
+    eval { $self->query("drop table ${db_name}_rel cascade constraints") };
+    $ENV{VAMP_DEBUG} && $@ and warn $@;
 }
 
 1;

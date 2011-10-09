@@ -80,7 +80,6 @@ sub _inflate_row {
         my @keys = split /\./, $_->{key}; 
         if( defined $_->{datatype} && $_->{datatype} eq 'a' ) {
             my $x = $self->_deepen( \%row, @keys );
-            warn ">>>>> $$x ";
             push @{ $$x }, $_->{value}; 
         } else {
             my $x = $self->_deepen( \%row, @keys );
