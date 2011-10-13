@@ -7,11 +7,13 @@ package Vamp::Database;
 #use Mouse;
 use strict;
 use Try::Tiny;
-use YAML; # XXX
+use Vamp;
 use Vamp::Util;
 use Vamp::ResultSet;
 use Vamp::Collection;
 use base 'DBIx::Simple' ;
+
+use YAML; # XXX
 
 sub collection {
     my ($self, $collname ) = @_;
@@ -102,7 +104,7 @@ sub _is_special {
         my %vals;
         my %conds;
         for( keys %$v ) {
-            /-like|-not_like/
+            /-like|-not_like|\>|\<|\!|\=/
                 ? $conds{ $_ } = $v->{$_}
                 : $vals{ $_ } = $v->{$_};
         }
@@ -111,12 +113,36 @@ sub _is_special {
     return ($v,undef);
 }
 
+sub _flatten_as_hash {
+    my $self = shift;
+    my @flat = $self->_flatten( @_ );
+    # turn array into hash
+    my $flat_hash = {};
+    $flat_hash->{ $_->{key} } = $_->{value} for @flat;
+    return $flat_hash;
+}
+
+sub _quote_keys {
+    my ($self, $hash) = @_;
+    return {} unless ref $hash eq 'HASH' && keys %$hash;
+    my %ret;
+    $ret{ '"' . $_ . '"' } = $hash->{$_} for keys %$hash;
+    \%ret;
+}
+
+sub _shorten_keys {
+    my ($self, $hash) = @_;
+    return {} unless ref $hash eq 'HASH' && keys %$hash;
+    my %ret;
+    #$ret{ short($_) } = $hash->{$_} for keys %$hash;
+}
+
 sub _flatten {
     my ($self, $where, $prefix) = @_;
     my @flat;
     my $ref = ref $where;
     if( $ref eq '' ) {
-        return [{ oid => $where }];
+        return { oid => $where };
     }
     elsif( $ref eq 'HASH' ) {
         while( my ($k,$v) = each %$where ) {
@@ -142,6 +168,7 @@ sub _flatten {
     else {
         die 'invalid type';
     }
+    return @flat;
 }
 
 sub _abstract {

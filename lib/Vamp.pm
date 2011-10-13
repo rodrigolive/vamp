@@ -6,6 +6,8 @@ use DBIx::Simple;
 use Vamp::Database;
 use Try::Tiny;
 
+use constant DEBUG => $ENV{VAMP_TRACE} || $ENV{VAMP_DEBUG} || 0;
+
 sub connect {
     my ($self, %args ) = @_;
     #my $db = DBIx::Simple->new( @_ );
@@ -22,4 +24,29 @@ sub connect {
     return $db;
 }
 
+=head1 NAME
+
+Vamp - NoSQL Document-Graph DB on top of plain-old DBI
+
+=head1 SYNOPSIS
+
+    my $db = Vamp->connect( db=>'vamp', args=>['dbi:Oracle://locahost:1521', 'user', 'pass' ] );
+    my $collection = $db->collection('employee');
+    $collection->insert({ name=>'Gregory', age=>25 });
+    my $rs = $collection->find({ age=>[ '>', 20 ] });
+    
+    while( my $rec = $rs->next ) {
+        say $rec->{name};  
+    }
+
+=head1 DESCRIPTION
+
+This module mimics the interface and functionality of popular document
+databases such as MongoDB and CouchDB, giving similar functionality
+on top of a standard DBI connection (currently L<DBD::Oracle> only).
+
+The idea is to make it easier to transition
+your app from a SQL backend to a NoSQL one. 
+
+=cut
 1;

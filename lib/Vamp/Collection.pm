@@ -28,9 +28,11 @@ sub insert {
 
 sub find {
     my $self = shift;
-    my $where = ref $_[0] eq 'HASH' ? shift : \%{ @_ };
-    my $rs = $self->db->query_findall( $self->name, $where );
-    bless $rs, 'Vamp::ResultSet';
+    my ($where, $opts ) = ref $_[0] eq 'HASH' 
+        ? ( shift(), shift() )
+        : ( \%{ @_ } , {} );
+    my $query = $self->db->build_query_findall( $self->name, $where, $opts );
+    my $rs = Vamp::ResultSet->new( db=>$self->db, query=>$query );
     return wantarray ? $rs->all : $rs;
 }
 

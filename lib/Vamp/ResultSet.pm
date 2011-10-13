@@ -1,14 +1,20 @@
 package Vamp::ResultSet;
 use strict;
 use warnings;
-use base 'DBIx::Simple::Result';
+use Vamp;
+
+sub new {
+    my ($class, %args ) = @_;
+    bless \%args, $class;
+}
 
 sub all {
     my $self = shift;
     my @rows;
     my @ret;
     my $lastid;
-    for my $r ( $self->hashes ) {
+    $self->{rs} = $self->{db}->query( $self->{query} ); 
+    for my $r ( $self->{rs}->hashes ) {
         my $oid = $r->{oid};
         if( defined $lastid && $oid != $lastid ) {
             push @ret, $self->_inflate_row( @rows ); 
@@ -32,9 +38,10 @@ sub next {
     my @rows;
     my $lastid = $self->{lastid};
     push @rows, delete $self->{lastrow} if $self->{lastrow};
-    while( my $r = $self->hash ) {
+    $self->{rs} = $self->{db}->query( @{ $self->{query} } ); 
+    while( my $r = $self->{rs}->hash ) {
         my $oid = $r->{oid};
-        #warn YAML::Dump( $r );
+        #warn ">>>>>>>" . YAML::Dump( $r );
         if( defined $lastid && $oid != $lastid ) {
             $self->{lastrow} = $r;
             $self->{lastid} = $oid;
@@ -46,6 +53,14 @@ sub next {
     }
     @rows and return $self->_inflate_row( @rows );
     return undef;
+}
+
+sub count {
+    my $self = shift;
+    my ($sql, @binds ) =  @{ $self->{query} };
+    $sql = "SELECT COUNT(*) FROM ( SELECT distinct oid FROM ( $sql ) )";
+    $self->{rs} = $self->{db}->query( $sql, @binds );
+    return $self->{rs}->list;
 }
 
 =head2 _inflate_row
@@ -74,16 +89,16 @@ sub _inflate_row {
     my %row;
     #warn YAML::Dump( \@_ );
     # for each db kv row
-    for( @_ ) {
-        my $oid = $_->{oid};
+    for my $kv_row ( @_ ) {
+        my $oid = $kv_row->{oid};
         $row{ id } ||= $oid;
-        my @keys = split /\./, $_->{key}; 
-        if( defined $_->{datatype} && $_->{datatype} eq 'a' ) {
+        my @keys = split /\./, $kv_row->{key}; 
+        if( defined $kv_row->{datatype} && $kv_row->{datatype} eq 'a' ) {
             my $x = $self->_deepen( \%row, @keys );
-            push @{ $$x }, $_->{value}; 
+            push @{ $$x }, $kv_row->{value}; 
         } else {
             my $x = $self->_deepen( \%row, @keys );
-            $$x = $_->{value}; 
+            $$x = $kv_row->{value}; 
         }
     }
     \%row;

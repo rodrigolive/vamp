@@ -16,6 +16,8 @@ into an array. Requires an unique rowid for ordering (or order by row id)
 - order by errors
 - paging
 - update, upsert
+- obj id in hash? _id ? oid? _oid?
+- flex obj id ? primary key ?
 - relationships
 
    my $rel = $db->relation('has' => from=>$id, to=>$id, data=>{ name=>'joe' } ); 

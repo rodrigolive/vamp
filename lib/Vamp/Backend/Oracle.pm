@@ -3,6 +3,7 @@ use Mouse;
 use Try::Tiny;
 use DBD::Oracle qw(:ora_types);
 use base 'Vamp::Database';
+use constant DEBUG => Vamp::DEBUG();
 
 sub drop {
     my $self = shift;
@@ -39,24 +40,54 @@ sub query_find_id {
 }
 
 sub build_query_findall {
-    my ($self, $collname, $where ) = @_;
+    my ($self, $collname, $where, $opts ) = @_;
     my $db_name = $self->{db_name};
-    my $query_head = "SELECT DISTINCT oid FROM ${db_name}_kv ";
-    my $coll_match = qq{ AND EXISTS ( select 1 from ${db_name}_obj vamp3
-        where vamp3.collection='$collname' and vamp3.id=vamp_kv.oid ) };
-    my @sqls;
-    my @all_binds;
-    my @wh = $self->_flatten( $where );
-    for my $wh ( @wh ) {
-        my ( $where, @binds ) = $self->_abstract( $wh );
-        my $sql = $query_head . $where . $coll_match;
-        push @sqls,      $sql;
-        push @all_binds, @binds;
+    #my $query_head = "SELECT DISTINCT oid FROM ${db_name}_kv ";
+    #my $coll_match = qq{ AND EXISTS ( select 1 from ${db_name}_obj vamp3
+    #    where vamp3.collection='$collname' and vamp3.id=vamp_kv.oid ) };
+    $where = $self->_flatten_as_hash( $where );
+
+    my @pivot_cols;
+    my @order_by;
+    # where?
+    for my $key ( keys %$where ) {
+        next unless length $key;
+        push @pivot_cols, $key;
     }
-    my $from = join ' INTERSECT ', @sqls;
-    my $sql = "SELECT DISTINCT oid FROM ( $from ) vamp2 WHERE vamp1.oid = vamp2.oid ";
-    $sql = "SELECT oid,key,value,datatype FROM ${db_name}_kv vamp1 WHERE EXISTS ( $sql ) ORDER BY vamp1.oid"; 
-    ( $sql, @all_binds );
+    # order_by ?
+    if( my $order_by = $opts->{order_by} ) {
+        @order_by = ref $order_by eq 'ARRAY' ? @$order_by : ( $order_by );
+        for my $order_by_column ( @order_by ) {
+            $order_by_column =~ s{ |DESC|ASC}{}gi;
+            push @pivot_cols, qq{"$order_by_column"}; 
+        }
+    }
+    # TODO limit?
+    # TODO select?
+
+    my $where_quoted = $self->_quote_keys( $where );
+    my ( $wh, @binds ) = keys %$where ? $self->_abstract( $where_quoted ) : ('WHERE 1=1');
+    #warn $wh;
+    my $pivots = join ',' => qw/oid/,
+        map {
+            qq{max( case when key='$_' then to_char(value) else '' end) as "$_"};
+        } @pivot_cols ;
+    my $selects = join ',' => qw/kv2.oid kv2.key kv2.value kv2.datatype/, map { qq{"$_"} } @pivot_cols;
+    my $order_by = join ',', @order_by, 'kv2.oid', 'key', 'kv2.id';
+    my $sql = qq{ 
+        select $selects from (
+            select $pivots
+            from vamp_kv kv,vamp_obj obj
+            where kv.oid = obj.id and obj.collection=?
+            group by oid
+        ) pivot, vamp_kv kv2
+        $wh
+        and kv2.oid = pivot.oid
+        order by $order_by
+    };
+    DEBUG && warn $sql;
+    #warn $sql;
+    [ $sql, $collname, @binds ];
 }
 
 sub query_findall {
