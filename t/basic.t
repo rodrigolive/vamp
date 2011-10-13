@@ -22,7 +22,7 @@ $company->insert({ name=>'joe', age=>55 });
 
 $coll->insert({ name=>'joe', age=>20 });
 $coll->insert({ name=>'jack', age=>33 });
-$coll->insert({ name=>{ first=>'Susie', last=>'Doe' }, age=>20 });
+$coll->insert({ name=>{ first=>'Susie', last=>'Doe' }, age=>25 });
 $coll->insert({ name=>'listy', age=>20, belongings=>[qw/house car boat/] });
 
 {
@@ -30,8 +30,17 @@ $coll->insert({ name=>'listy', age=>20, belongings=>[qw/house car boat/] });
     is $p->{age}, 20, 'find_one';
 }
 {
+    my $rs = $coll->find({ age => { '>=', 25 } });
+    is $rs->count, 2, 'where compare with count';
+}
+{
+    my $rs = $coll->find({ age => { '>=', 25 } }, { order_by=>'age' });
+    is $rs->count, 2, 'where compare with count';
+}
+{
     my $p = $coll->find_one({ name=>'listy' });
     yy $p;
+    is ref( $p->{belongings} ), 'ARRAY', 'array ok';
     is $p->{belongings}->[0], 'house', 'array find';
 }
 {
@@ -51,9 +60,11 @@ $coll->insert({ name=>'listy', age=>20, belongings=>[qw/house car boat/] });
     is $row->{name}->{first}, 'bob', 'hash deep find';
     is_deeply $row->{family}->{kids}, ['kyle', 'lucy'], 'arr deep find';
 }
-#{
-#    my $rs = $coll->query({}, { order_by=>'name', rows=>5 });
-#}
+{
+    $coll->insert({ name=>'longy', long_field_name_hard_to_store_cos_it_has_more_than_30_chars => 99 });
+    my $obj = $coll->find_one({ name=>'longy' });
+    is $obj->{long_field_name_hard_to_store_cos_it_has_more_than_30_chars}, 99, 'long field';
+}
 
 done_testing;
 
