@@ -10,28 +10,32 @@ use VampTest;
 my $db = test_db();
 #$db->recreate;
 my $jobs = $db->collection('jobs');
-#$jobs->drop;
 
 use Benchmark qw/:hireswallclock/;
 
 print "Dump table tests\n";
 my $k = 0;
-if(0) { timethis( 1, sub{
-    $jobs->insert_from_query( 
-        query=>'select * from bali_job@gbp'
-    );
-});
+if(0) {
+    $jobs->drop;
+    timethis( 1, sub{
+        $jobs->insert_from_query( 
+            query=>'select * from bali_job'
+        );
+    });
 };
+
+$jobs->{db}->dbh->{LongReadLen} = 999999999;
+#$jobs->{db}->dbh->{LongTrunkOK} = 1;
 
 warn "Optimize...";
 {
     my $k = 0;
-    $jobs->{db}->dbh->{LongReadLen} = 999999999;
-    #$jobs->{db}->dbh->{LongTrunkOK} = 1;
-    timethis( 30, sub{
+    timethis( 100, sub{
        my $rs = $jobs->{db}->query(q{
-        select kv2.oid,kv2.key,kv2.value,kv2.datatype,"name" from (
-            select oid, max( case when key='name' then to_char(value) else '' end) as "name"
+/*
+       select count(*) from (
+               select kv2.oid,kv2.key,kv2.value,kv2.datatype,"name" from (
+            select oid, max( case when key='name' then val else '' end) as "name"
             from vamp_kv kv,vamp_obj obj
             where kv.oid = obj.id and obj.collection='jobs'
             group by oid
@@ -39,7 +43,41 @@ warn "Optimize...";
          WHERE ( "name" LIKE '%3__' )
         and kv2.oid = pivot.oid
         order by kv2.oid,key,kv2.id
-            
+       )
+*/
+
+--- 3 times faster than case:
+
+       select count(*) from (
+        with pivot_name as (
+            select oid, val as "name"  -- use val for half the speed
+            from vamp_kv kv,vamp_obj obj
+            where kv.oid = obj.id and obj.collection='jobs' and key='name'
+        )
+        select kv2.oid,kv2.key,kv2.datatype,"name" from pivot_name, vamp_kv kv2
+         WHERE ( "name" LIKE '%3__' )
+        and kv2.oid = pivot_name.oid (+)
+        order by kv2.oid,key,kv2.id
+        )
+
+/*
+       select count(*) from (
+        with pivot_name as (
+            select oid, val as "name"  -- use val for half the speed
+            from vamp_kv kv,vamp_obj obj
+            where kv.oid = obj.id and obj.collection='jobs' and key='name'
+        ), pivot_status as (
+            select oid, val as "status"
+            from vamp_kv kv,vamp_obj obj
+            where kv.oid = obj.id and obj.collection='jobs' and key='status'
+        )
+        select kv2.oid,kv2.key,kv2.datatype,"name","status" from pivot_name, pivot_status, vamp_kv kv2
+         WHERE ( "name" LIKE '%3__' or "status" LIKE 'KILLED' )
+        and kv2.oid = pivot_name.oid (+)  and kv2.oid = pivot_status.oid (+)
+        order by kv2.oid,key,kv2.id
+        )
+*/
+
 /*            with pivot AS (
                 select oid, max( case when key='name' then to_char(value) else '' end) as "name"
                 from vamp_kv kv,vamp_obj obj
@@ -53,19 +91,18 @@ warn "Optimize...";
        });
        #warn $rs->text('box');
        my @rows = $rs->hashes;
-       warn join ', ', keys %{ $rows[0] };
+       warn join ', ', values %{ $rows[0] };
        $k += scalar @rows;
        warn $k;
     });
     warn "Total rows: $k";
 }
+die "OK";
 
 warn "YAML.....";
 {
     # YAML - document
     my $k = 0;
-    $jobs->{db}->dbh->{LongReadLen} = 999999999;
-    #$jobs->{db}->dbh->{LongTrunkOK} = 1;
     timethis( 30, sub{
        my $rs = $jobs->{db}->query(q{
             with pivot AS (
@@ -80,7 +117,8 @@ warn "YAML.....";
             order by vamp_obj.id
        });
        #warn $rs->text('box');
-       my @rows = map { YAML::XS::Load $_->{document} } $rs->hashes;
+       use YAML::XS;
+       my @rows = map { YAML::XS::Load( $_->{document} ) } $rs->hashes;
        warn join ', ', keys %{ $rows[0] };
        $k += scalar @rows;
        warn $k;
@@ -91,7 +129,8 @@ warn "YAML.....";
 {
     my $k = 0;
     timethis( 50, sub{
-       my $rs = $jobs->{db}->query(q{select * from bali_job@gbp where name like '%3__'});
+       my $rs = $jobs->{db}->query(q{select * from bali_job where name like '%3__'});
+       #warn $rs->text('table'); return;
        my @rows = $rs->hashes;
        #$k += scalar map { keys %$_ } @rows;
        $k += scalar @rows;

@@ -24,6 +24,7 @@ sub insert {
         }
     } catch {
         $self->rollback( oid=>$oid );
+        die "Error inserting: " . shift();
     };
 }
 
@@ -142,8 +143,8 @@ sub _obj {
 
 sub _dump {
     my ($self , $data ) = @_;
-    use YAML::XS;
-    return YAML::XS::Dump $data;
+    require YAML::XS;
+    return YAML::XS::Dump( $data );
 }
 
 sub _rollback {
