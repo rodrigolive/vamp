@@ -50,15 +50,18 @@ $coll->insert({ name=>'listy', age=>20, belongings=>[qw/house car boat/] });
     is scalar @all, 100, 'array all';
 }
 {
-    my $rs = $nums->find({}, { start => 10, limit=>10, order_by=>'num', hint=>{ num=>'number' } });
+    my $rs = $nums->find({}, { start => 10, limit=>9, order_by=>'num', hint=>{ num=>'number' } });
+    yy $rs->as_query;
     my @all = $rs->all;
     yy \@all;
     is $all[0]->{num}, 10, 'start limit ok';
-    is scalar @all, 10, 'limit at 10';
+    is $all[8]->{num}, 18, 'start + limit ok';
+    is $all[9], undef, 'start + limit +1 ok';
+    is scalar @all, 9, 'limit at 10';
 }
 {
     my $p = $coll->find_one({ name=>'listy' });
-    yy $p;
+    #yy $p;
     is ref( $p->{belongings} ), 'ARRAY', 'array ok';
     is $p->{belongings}->[0], 'house', 'array find';
 }
