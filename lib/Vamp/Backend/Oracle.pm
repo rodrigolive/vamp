@@ -100,7 +100,7 @@ sub build_query_findall {
     my $limit = $opts->{limit};
     $sql = do {
         #my $page_num = int( $start / $limit ) + 1 ;
-        my $limit_sql = $limit ? "where rownum <= $limit" : "";
+        my $limit_sql = $limit ? "where rownum < " . ( $limit + $start ) : "";
         my $start_sql = $start ? "where rownum__ >= $start" : "";
         qq{
             select * from (
@@ -170,7 +170,8 @@ sub deploy {
     catch {
         $self->query(qq{create table $self->{db_name}_obj (
             id varchar(1024) primary key,
-            collection varchar(1024)
+            collection varchar(1024),
+            document CLOB
         )});
         $self->query("create sequence ${db_name}_obj_seq");
         $self->query("create trigger ${db_name}_obj_tr
