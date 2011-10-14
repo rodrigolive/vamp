@@ -10,6 +10,7 @@ use constant DEBUG => $ENV{VAMP_TRACE} || $ENV{VAMP_DEBUG} || 0;
 
 sub connect {
     my ($self, %args ) = @_;
+    $args{deploy} //= 1;
     #my $db = DBIx::Simple->new( @_ );
     #$db->query( 'select * from vamp_kv' );
     my @connection = ref $args{args} eq 'ARRAY' ? @{$args{args}} : $args{args}; 
@@ -20,7 +21,7 @@ sub connect {
     warn $@ if $@;
     bless $db, $backend;
     $db->{db_name} = $args{db} || 'vamp';
-    $db->deploy;
+    $db->deploy if $args{deploy};
     return $db;
 }
 

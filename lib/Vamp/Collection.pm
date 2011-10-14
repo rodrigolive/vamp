@@ -30,11 +30,13 @@ sub find {
     my $self = shift;
     my ($where, $opts ) = ref $_[0] eq 'HASH' 
         ? ( shift(), shift() )
-        : ( \%{ @_ } , {} );
+        : ( \%{ @_ || {} } , {} );
     my $query = $self->db->build_query_findall( $self->name, $where, $opts );
     my $rs = Vamp::ResultSet->new( db=>$self->db, query=>$query );
     return wantarray ? $rs->all : $rs;
 }
+
+*query = \&find;
 
 # this is based on the older oid intersect
 sub find_all {

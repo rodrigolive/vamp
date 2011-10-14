@@ -13,7 +13,7 @@ sub all {
     my @rows;
     my @ret;
     my $lastid;
-    $self->{rs} = $self->{db}->query( $self->{query} ); 
+    $self->{rs} = $self->{db}->query( @{ $self->{query} } ); 
     for my $r ( $self->{rs}->hashes ) {
         my $oid = $r->{oid};
         if( defined $lastid && $oid != $lastid ) {
@@ -25,6 +25,11 @@ sub all {
     }
     @rows and push @ret, $self->_inflate_row( @rows );
     return @ret;
+}
+
+sub as_query {
+    my $self = shift;
+    return $self->{query};
 }
 
 sub first {

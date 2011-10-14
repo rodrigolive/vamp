@@ -15,6 +15,7 @@ my $coll = $db->collection('person');
 $coll->drop;
 
 my $company = $db->collection('company');
+my $nums = $db->collection('numbers');
 
 # base data
 $company->insert({ name=>'joe', age=>55 });
@@ -31,11 +32,29 @@ $coll->insert({ name=>'listy', age=>20, belongings=>[qw/house car boat/] });
 }
 {
     my $rs = $coll->find({ age => { '>=', 25 } });
+    is ref $rs->as_query, 'ARRAY', 'as_query ok';
     is $rs->count, 2, 'where compare with count';
 }
 {
     my $rs = $coll->find({ age => { '>=', 25 } }, { order_by=>'age' });
-    is $rs->count, 2, 'where compare with count';
+    is $rs->count, 2, 'where compare with count and order_by';
+}
+{
+    $nums->insert({ num=>$_ }) for 1..100;
+    my $rs = $nums->find({}, { start => 50, order_by=>'num', hint=>{ num=>'number' } });
+    #warn $rs->as_query->[0];
+    is $rs->first->{num}, 50, 'start ok';
+}
+{
+    my @all = $nums->find->all;
+    is scalar @all, 100, 'array all';
+}
+{
+    my $rs = $nums->find({}, { start => 10, limit=>10, order_by=>'num', hint=>{ num=>'number' } });
+    my @all = $rs->all;
+    yy \@all;
+    is $all[0]->{num}, 10, 'start limit ok';
+    is scalar @all, 10, 'limit at 10';
 }
 {
     my $p = $coll->find_one({ name=>'listy' });

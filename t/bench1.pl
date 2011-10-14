@@ -8,7 +8,6 @@ use lib 't';
 use VampTest;
 
 my $db = test_db();
-
 $db->recreate;
 my $coll = $db->collection('person');
 $coll->drop;
