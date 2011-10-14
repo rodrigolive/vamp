@@ -30,8 +30,53 @@ warn "Optimize...";
     #$jobs->{db}->dbh->{LongTrunkOK} = 1;
     timethis( 30, sub{
        my $rs = $jobs->{db}->query(q{
-            select id,document from vamp_obj
-             WHERE collection='jobs' and rownum < 128
+        select kv2.oid,kv2.key,kv2.value,kv2.datatype,"name" from (
+            select oid, max( case when key='name' then to_char(value) else '' end) as "name"
+            from vamp_kv kv,vamp_obj obj
+            where kv.oid = obj.id and obj.collection='jobs'
+            group by oid
+        ) pivot, vamp_kv kv2
+         WHERE ( "name" LIKE '%3__' )
+        and kv2.oid = pivot.oid
+        order by kv2.oid,key,kv2.id
+            
+/*            with pivot AS (
+                select oid, max( case when key='name' then to_char(value) else '' end) as "name"
+                from vamp_kv kv,vamp_obj obj
+                where kv.oid = obj.id and obj.collection='jobs'
+                group by oid
+            )
+            select pivot.oid,document,"name" from pivot, vamp_obj
+             WHERE ( "name" LIKE '%3__' )
+            and vamp_obj.id = pivot.oid
+            order by vamp_obj.id */
+       });
+       #warn $rs->text('box');
+       my @rows = $rs->hashes;
+       warn join ', ', keys %{ $rows[0] };
+       $k += scalar @rows;
+       warn $k;
+    });
+    warn "Total rows: $k";
+}
+
+warn "YAML.....";
+{
+    # YAML - document
+    my $k = 0;
+    $jobs->{db}->dbh->{LongReadLen} = 999999999;
+    #$jobs->{db}->dbh->{LongTrunkOK} = 1;
+    timethis( 30, sub{
+       my $rs = $jobs->{db}->query(q{
+            with pivot AS (
+                select oid, max( case when key='name' then to_char(value) else '' end) as "name"
+                from vamp_kv kv,vamp_obj obj
+                where kv.oid = obj.id and obj.collection='jobs'
+                group by oid
+            )
+            select pivot.oid,document,"name" from pivot, vamp_obj
+             WHERE ( "name" LIKE '%3__' )
+            and vamp_obj.id = pivot.oid
             order by vamp_obj.id
        });
        #warn $rs->text('box');
@@ -58,8 +103,8 @@ warn "Optimize...";
 
 $k = 0;
 print "Find_one tests\n";
-timethis( 5, sub{
-   my $rs = $jobs->find({ name=>{ -like => '%3__' } }); 
+timethis( 50, sub{
+   my $rs = $jobs->find({ name=>{ -like => '%3__' } }, { start=>0, limit=>30 }); 
    #die yy $rs->all;
    my @rows = $rs->all;
    warn join ', ', keys %{ $rows[0] };
