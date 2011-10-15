@@ -46,6 +46,7 @@ warn "Optimize...";
        )
 */
 
+/*
 --- 3 times faster than case:
 
        select count(*) from (
@@ -59,24 +60,27 @@ warn "Optimize...";
         and kv2.oid = pivot_name.oid (+)
         order by kv2.oid,key,kv2.id
         )
+*/
 
-/*
+
        select count(*) from (
         with pivot_name as (
             select oid, val as "name"  -- use val for half the speed
             from vamp_kv kv,vamp_obj obj
             where kv.oid = obj.id and obj.collection='jobs' and key='name'
+            and val LIKE '%3__' 
         ), pivot_status as (
             select oid, val as "status"
             from vamp_kv kv,vamp_obj obj
             where kv.oid = obj.id and obj.collection='jobs' and key='status'
+            and val = 'KILLED'
         )
         select kv2.oid,kv2.key,kv2.datatype,"name","status" from pivot_name, pivot_status, vamp_kv kv2
-         WHERE ( "name" LIKE '%3__' or "status" LIKE 'KILLED' )
+         WHERE ( "name" LIKE '%3__' and "status" LIKE 'KILLED' )
         and kv2.oid = pivot_name.oid (+)  and kv2.oid = pivot_status.oid (+)
         order by kv2.oid,key,kv2.id
         )
-*/
+
 
 /*            with pivot AS (
                 select oid, max( case when key='name' then to_char(value) else '' end) as "name"
