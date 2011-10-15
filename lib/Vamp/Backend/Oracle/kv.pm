@@ -77,23 +77,38 @@ sub build_query_findall {
 
     # TODO select?
 
+    # where
     my $where_quoted = $self->_quote_keys( $where );
     my ( $wh, @binds ) = keys %$where ? $self->_abstract( $where_quoted ) : ('WHERE 1=1');
-    #warn $wh;
+    # pivots
     my $pivots = join ',' => qw/oid/,
+    my $pivots_with = join ',' => 
         map {
-            qq{max( case when key='$_' then to_char(value) else '' end) as "$_"};
+            unshift @binds, $collname;
+            qq{"pivot_$_" as (
+                    select oid, to_char(value) as "$_" from vamp_kv kv,vamp_obj obj
+                    where kv.oid = obj.id and obj.collection=? and key='$_'
+                )
+            }
         } keys %pivot_cols;
+    $pivots_with and $pivots_with = "WITH $pivots_with";
+    my $pivots_from = join ',' => 'vamp_kv kv2', 'vamp_obj obj2', map { qq{ "pivot_$_" } } keys %pivot_cols;
+    my $pivots_outer = join ' and ' => map { qq{kv2.oid = "pivot_$_".oid (+)} } keys %pivot_cols;
+    $pivots_outer ||= '1=1';
+
     my $selects = join ',' => qw/kv2.oid kv2.key kv2.value kv2.datatype/, map { qq{"$_"} } keys %pivot_cols;
     my $order_by_pivot = @order_by ? 'order by ' . join ',', @order_by : '';
     my $order_by = join ',', @order_by, 'kv2.oid', 'key', 'kv2.id';
     
     my $sql = qq{
-            select $pivots
-            from vamp_kv kv,vamp_obj obj
-            where kv.oid = obj.id and obj.collection=?
-            group by oid
-            $order_by_pivot
+        $pivots_with
+        SELECT $selects
+        FROM $pivots_from
+         $wh
+           and $pivots_outer
+           and obj2.id = kv2.oid
+           and obj2.collection = ?
+         ORDER BY $order_by
     };
     # limit? (0 indexed)
     my $start = $opts->{start};
@@ -110,17 +125,17 @@ sub build_query_findall {
         }
     } if defined $start || defined $limit;
 
-    $sql = qq{ 
-        select $selects from (
-            $sql
-        ) pivot, vamp_kv kv2
-        $wh
-        and kv2.oid = pivot.oid
-        order by $order_by
-    };
+#    $sql = qq{ 
+#        select $selects from (
+#            $sql
+#        ) pivot, vamp_kv kv2
+#        $wh
+#        and kv2.oid = pivot.oid
+#        order by $order_by
+#    };
     DEBUG && warn $sql;
     #warn $sql;
-    [ $sql, $collname, @binds ];
+    [ $sql, @binds, $collname ];
 }
 
 sub query_findall {
