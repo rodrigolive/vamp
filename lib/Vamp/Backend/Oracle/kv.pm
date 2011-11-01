@@ -39,6 +39,14 @@ sub query_find_id {
     return bless { st => $st, lc_columns => $self->{lc_columns} }, $self->{result_class};
 }
 
+sub build_query_find_id {
+    my ($self, $collname, @ids ) = @_;
+    my $db_name = $self->{db_name};
+    my ($where, @binds) = $self->_abstract({ 'obj.id'=>\@ids });
+    my $sql = "SELECT * FROM ${db_name}_kv kv,${db_name}_obj obj $where and obj.id=kv.oid order by oid";
+    [ $sql, @binds ];
+}
+
 sub build_query_findall {
     my ($self, $collname, $where, $opts ) = @_;
     my $db_name = $self->{db_name};
@@ -75,11 +83,20 @@ sub build_query_findall {
         }
     }
 
-    # TODO select?
-
     # where
     my $where_quoted = $self->_quote_keys( $where );
     my ( $wh, @binds ) = keys %$where ? $self->_abstract( $where_quoted ) : ('WHERE 1=1');
+
+    # select?
+    my $select_filter_str;
+    my $select_filter = $opts->{select} ? [ $self->_abstract( key => $opts->{select} ) ] : [];
+    if( @$select_filter && $select_filter->[0] =~ s/WHERE/and/ig ) {
+        push @binds, splice @{ $select_filter || [] },1;
+        $select_filter_str = $select_filter->[0];
+    } else {
+        $select_filter_str = '';
+    }
+
     # pivots
     my $pivots = join ',' => qw/oid/,
     my $pivots_with = join ',' => 
@@ -105,6 +122,7 @@ sub build_query_findall {
         SELECT $selects
         FROM $pivots_from
          $wh
+           $select_filter_str
            and $pivots_outer
            and obj2.id = kv2.oid
            and obj2.collection = ?
@@ -135,6 +153,7 @@ sub build_query_findall {
 #    };
     DEBUG && warn $sql;
     #warn $sql;
+    #warn YAML::Dump( [ @binds, $collname ] );
     [ $sql, @binds, $collname ];
 }
 
@@ -189,14 +208,6 @@ sub deploy {
             document CLOB
         )});
         $self->query("create sequence ${db_name}_obj_seq");
-        $self->query("create trigger ${db_name}_obj_tr
-            BEFORE INSERT ON ${db_name}_obj
-            REFERENCING NEW AS NEW OLD AS OLD
-            FOR EACH ROW
-            BEGIN
-               SELECT ${db_name}_obj_seq.NEXTVAL INTO :NEW.ID FROM dual;
-            END;
-        ");
     };
     try { $self->query("select count(*) from ${db_name}_kv") }
     catch {

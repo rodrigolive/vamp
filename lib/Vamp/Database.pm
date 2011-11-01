@@ -6,6 +6,7 @@ Base class for all backends.
 package Vamp::Database;
 #use Mouse;
 use strict;
+#use Mouse;
 use Try::Tiny;
 use Vamp;
 use Vamp::Util;
@@ -26,6 +27,7 @@ sub recreate {
     $self->deploy;
 }
 
+# XXX unused
 sub query_find_id {
     my ($self, %args) = @_;
     my $db_name = $self->{db_name};
@@ -54,46 +56,10 @@ sub drop_collection {
     $self->query("delete from ${db_name}_obj where collection = ?", $collname );
 }
 
-sub query_find_abs {
-    my ($self, $where, @binds ) = @_;
-    my $db_name = $self->{db_name};
-    my $query_head = "SELECT DISTINCT oid FROM ${db_name}_kv ";
-    my @wh = $self->_flatten( $where );
-    #push @wh, \[ "${db_name}_obj.id = ${db_name}_kv.oid" ];
-    #my ($where,@binds) = $self->_abstract( -or => \@wh );
-    #warn join',',$self->query( $query_head . $where, @binds )->flat;
-    my @all_oids;
-    for my $wh ( @wh ) {
-        my ($where,@binds) = $self->_abstract( $wh );
-        my $query = $query_head . $where;
-        #warn $query;
-        my @oids = $self->query( $query, @binds )->flat;
-        push @all_oids, \@oids;
-    }
-    my @res = intersect(@all_oids);
-    wantarray ? @res : \@res;
-}
-
-sub query_findall {
-    my ($self, $collname, $where ) = @_;
-    my $db_name = $self->{db_name};
-    my $query_head = "SELECT DISTINCT oid FROM ${db_name}_kv vamp_kv";
-    my $coll_match = " AND EXISTS ( select 1 from ${db_name}_obj vamp3 where vamp3.collection='$collname' and vamp3.id=vamp_kv.oid ) ";
-    my @sqls;
-    my @all_binds;
-    my @wh = $self->_flatten( $where );
-    for my $wh ( @wh ) {
-        my ( $where, @binds ) = $self->_abstract( $wh );
-        my $sql = $query_head . $where . $coll_match;
-        push @sqls,      $sql;
-        push @all_binds, @binds;
-    }
-    my $from = join ' INTERSECT ', @sqls;
-    my $sql = "SELECT DISTINCT oid FROM ( $from ) vamp2 WHERE vamp1.oid = vamp2.oid ";
-    #warn $sql;
-    $sql = "SELECT oid,key,value,datatype FROM ${db_name}_kv vamp1 WHERE EXISTS ( $sql ) ORDER BY vamp1.oid,id desc"; 
-    #warn Dump $self->query( $sql, @all_binds )->hashes;
-    $self->query( $sql, @all_binds );
+sub _dump {
+    my ($self , $data ) = @_;
+    require YAML::XS;
+    return YAML::XS::Dump( $data );
 }
 
 sub _is_special {
@@ -183,11 +149,15 @@ sub _abstract {
 sub drop_database { 
     my $self = shift;
     my $db_name = $self->{db_name};
-    eval { $self->query("drop table ${db_name}_obj cascade constraints") }; 
-    $ENV{VAMP_DEBUG} && $@ and warn $@;
-    eval { $self->query("drop table ${db_name}_kv cascade constraints") };
-    $ENV{VAMP_DEBUG} && $@ and warn $@;
-    eval { $self->query("drop table ${db_name}_rel cascade constraints") };
+
+    for my $suffix ( qw/_kv _obj _rel/ ) {
+        $self->drop_table( ${db_name} . $suffix );
+    }
+}
+
+sub drop_table { 
+    my ($self,$table) = @_;
+    eval { $self->query("drop table $table") }; 
     $ENV{VAMP_DEBUG} && $@ and warn $@;
 }
 

@@ -47,7 +47,7 @@ sub next {
     while( my $r = $self->{rs}->hash ) {
         my $oid = $r->{oid};
         #warn ">>>>>>>" . YAML::Dump( $r );
-        if( defined $lastid && $oid != $lastid ) {
+        if( defined $lastid && $oid ne $lastid ) {
             $self->{lastrow} = $r;
             $self->{lastid} = $oid;
             last;

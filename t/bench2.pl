@@ -8,7 +8,6 @@ use lib 't';
 use VampTest;
 
 my $db = test_db();
-#$db->recreate;
 my $jobs = $db->collection('jobs');
 
 use Benchmark qw/:hireswallclock/;
@@ -16,10 +15,11 @@ use Benchmark qw/:hireswallclock/;
 print "Dump table tests\n";
 my $k = 0;
 if(0) {
+    $db->recreate;
     $jobs->drop;
     timethis( 1, sub{
         $jobs->insert_from_query( 
-            query=>'select * from bali_job'
+            query=>'select * from bali_job@gbp'
         );
     });
 };
@@ -62,7 +62,22 @@ warn "Optimize...";
         )
 */
 
+        WITH pivot_num as (
+                      select oid, to_char(value) as "name",NULL as "age" from vamp_kv kv,vamp_obj obj
+                      where kv.oid = obj.id and obj.collection='people' and key='name'
+                     UNION 
+                     select oid, NULL as "name",to_char(value) as "age" from vamp_kv kv3,vamp_obj obj3
+                      where kv3.oid = obj3.id and obj3.collection='people' and key='age'
+                  )
+         SELECT kv2.oid,kv2.key,kv2.value,kv2.datatype,"name","age"
+         FROM vamp_kv kv2,vamp_obj obj2, pivot_num 
+           WHERE 1=1
+             and kv2.oid = pivot_num.oid (+)
+             and obj2.id = kv2.oid
+             and obj2.collection = 'people'
+           ORDER BY to_number( "age" ),kv2.oid,key,kv2.id
 
+/*
        select count(*) from (
         with pivot_name as (
             select oid, val as "name"  -- use val for half the speed
@@ -80,7 +95,7 @@ warn "Optimize...";
         and kv2.oid = pivot_name.oid (+)  and kv2.oid = pivot_status.oid (+)
         order by kv2.oid,key,kv2.id
         )
-
+*/
 
 /*            with pivot AS (
                 select oid, max( case when key='name' then to_char(value) else '' end) as "name"
@@ -101,7 +116,6 @@ warn "Optimize...";
     });
     warn "Total rows: $k";
 }
-die "OK";
 
 warn "YAML.....";
 {
@@ -131,9 +145,8 @@ warn "YAML.....";
 }
 
 {
-    my $k = 0;
     timethis( 50, sub{
-       my $rs = $jobs->{db}->query(q{select * from bali_job where name like '%3__'});
+       my $rs = $jobs->{db}->query(q{select * from bali_job@gbp where name like '%3__'});
        #warn $rs->text('table'); return;
        my @rows = $rs->hashes;
        #$k += scalar map { keys %$_ } @rows;
@@ -144,23 +157,24 @@ warn "YAML.....";
 }
 
 
-$k = 0;
 print "Find_one tests\n";
+
 timethis( 50, sub{
-   my $rs = $jobs->find({ name=>{ -like => '%3__' } }, { start=>0, limit=>30 }); 
-   #die yy $rs->all;
-   my @rows = $rs->all;
-   warn join ', ', keys %{ $rows[0] };
-   $k += scalar @rows;
-   # while( my $r = $rs->next ) {
-   #     warn $r->{name};
-   # }
-   #warn $r->{name};
-   #my $r = $jobs->find({ name=>"me" . $k++ })->first;  # ultraslow
-   #is $r->{age}, $k, 'age ok';
+    my $k = 0;
+    my $rs = $jobs->find({ name=>{ -like => '%3__' } }, { start=>0, limit=>30 }); 
+    #die yy $rs->all;
+    my @rows = $rs->all;
+    warn join ', ', keys %{ $rows[0] };
+    $k += scalar @rows;
+    # while( my $r = $rs->next ) {
+    #     warn $r->{name};
+    # }
+    #warn $r->{name};
+    #my $r = $jobs->find({ name=>"me" . $k++ })->first;  # ultraslow
+    #is $r->{age}, $k, 'age ok';
+    warn "Total rows: $k";
 });
 
-warn "Total rows: $k";
 
 {
     my $rs = $jobs->query({}, { order_by=>'name', rows=>5 });

@@ -16,15 +16,29 @@ sub insert {
     my $self = shift;
     my $data = ref $_[0] eq 'HASH' ? shift : \%{ @_ };
     die 'invalid data' unless ref $data eq 'HASH';
-    my $oid = $self->_obj( data=>$data );
+    my $oid = $self->db->_create( data=>$data, serialize=>$self->serialize, collection=>$self->name );
     die 'no last oid' unless defined $oid;
     try {
         while( my ($k,$v) = each %$data ) {
             $self->_serialdo( do=>'insert', oid=>$oid, k=>$k, v=>$v ); 
         }
     } catch {
-        $self->rollback( oid=>$oid );
+        $self->_rollback( oid=>$oid );
         die "Error inserting: " . shift();
+    };
+}
+
+sub update {
+    my $self = shift;
+    my $oid = shift;
+    my $data = ref $_[0] eq 'HASH' ? shift : \%{ @_ };
+    try {
+        while( my ($k,$v) = each %$data ) {
+            $self->_serialdo( do=>'update', oid=>$oid, k=>$k, v=>$v ); 
+        }
+    } catch {
+        $self->_rollback( oid=>$oid );
+        die "Error updating: " . shift();
     };
 }
 
@@ -32,7 +46,9 @@ sub find {
     my $self = shift;
     my ($where, $opts ) = ref $_[0] eq 'HASH' 
         ? ( shift(), shift() )
-        : ( \%{ @_ || {} } , {} );
+        : @_
+            ? ( { id=>[@_] } , {} )
+            : ({},{});
     my $query = $self->db->build_query_findall( $self->name, $where, $opts );
     my $rs = Vamp::ResultSet->new( db=>$self->db, query=>$query );
     return wantarray ? $rs->all : $rs;
@@ -54,10 +70,17 @@ sub find_all {
     wantarray ? @objs : \@objs;
 }
 
+sub get {
+    my $self = shift;
+    my $query = $self->db->build_query_find_id( $self->name, @_ );
+    my $rs = Vamp::ResultSet->new( db=>$self->db, query=>$query );
+    @_ > 1 ? $rs : $rs->next; 
+}
 sub find_one {
     my $self = shift;
-    my $rs = $self->find( @_ );
-    $rs->next;
+    !ref $_[0]
+        ? $self->get( @_ )
+        : $self->find( @_ )->next;
 }
 
 =head2 insert_from_query
@@ -129,24 +152,6 @@ sub _get {
 }
 
 
-sub _obj {
-    my ($self , %args ) = @_;
-    my $db_name = $self->db->{db_name};
-    if ( $self->serialize && exists $args{data} ) {
-        $self->db->query( qq{insert into ${db_name}_obj ( collection, document ) values (?,?) },
-            $self->name, $self->_dump( $args{data} ) );
-    } else {
-        $self->db->query( qq{insert into ${db_name}_obj ( collection ) values (?) }, $self->name );
-    }
-    return $self->db->last_insert_id('','','','$self->{db_name}_obj');
-}
-
-sub _dump {
-    my ($self , $data ) = @_;
-    require YAML::XS;
-    return YAML::XS::Dump( $data );
-}
-
 sub _rollback {
     my ($self , %args ) = @_;
     my $oid = $args{oid};
@@ -165,17 +170,30 @@ sub _serialdo {
     my $ref = ref $value;
     my $db_name = $self->db->{db_name};
     if( ! $ref ) {
-        $self->db->query( qq{insert into ${db_name}_kv ( oid, key, value, datatype, seq, version ) values (??) },
-            $oid, $key, $value, $args{datatype} || 'v', $args{seq} || 1, $args{version} || 1
-        );
+        if( $args{do} eq 'insert' ) {
+            $self->db->_insert_kv(
+                oid      => $oid,
+                key      => $key,
+                value    => $value,
+                datatype => $args{datatype} || 'v',
+                seq      => $args{seq} || 1,
+                version  => $args{version} || 1
+            );
+        } 
+        elsif( $args{do} eq 'update' ) {
+            $self->db->_update_kv( oid=>$oid, key=>$key, value=>$value );
+        }
+        else {
+           die "Invalid do operation $args{do}"; 
+        }
     } elsif( $ref eq 'ARRAY' ) {
         my $cnt = 0;
         for( @$value ) {
-            $self->_serialdo( do=>'insert', oid=>$oid, k=>$key, v=>$_, seq=>$cnt, datatype=>'a', prefix=>'' ); 
+            $self->_serialdo( do=>$args{do}, oid=>$oid, k=>$key, v=>$_, seq=>$cnt, datatype=>'a', prefix=>'' ); 
         }
     } elsif( $ref eq 'HASH' ) {
         while( my ($k,$v) = each %$value ) {
-            $self->_serialdo( do=>'insert', oid=>$oid, k=>$k, v=>$v, prefix=>$key ); 
+            $self->_serialdo( do=>$args{do}, oid=>$oid, k=>$k, v=>$v, prefix=>$key ); 
         }
     } else {
         die "data type $ref not supported";
