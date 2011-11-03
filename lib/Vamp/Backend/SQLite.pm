@@ -185,8 +185,10 @@ sub deploy {
     try { $self->query("select count(*) from $self->{db_name}_rel") }
     catch {
         $self->query(qq{create table $self->{db_name}_rel (
-            id1 integer,
-            id2 integer,
+            id integer primary key autoincrement,
+            id1,
+            id2,
+            edge_name text,
             foreign key(id1) references $self->{db_name}_obj(id) on delete cascade,
             foreign key(id2) references $self->{db_name}_obj(id) on delete cascade
             )

@@ -15,7 +15,7 @@ sub connect {
     #$db->query( 'select * from vamp_kv' );
     my @connection = ref $args{args} eq 'ARRAY' ? @{$args{args}} : $args{args}; 
     my $db = Vamp::Database->new( @connection ); 
-    $db->{driver_name} = $db->dbh->{Driver}->{Name};
+    $db->{driver_name} = $args{backend} || $db->dbh->{Driver}->{Name};
     my $backend = "Vamp::Backend::$db->{driver_name}";
     eval "require $backend" or $backend = "Vamp::Backend::Generic";
     warn $@ if $@;
@@ -82,11 +82,12 @@ your app from a SQL backend to a NoSQL one.
         # updates
         my $id = $person->{id}
         $people->update( $id => { age=>56 } );
+        $people->upsert( $id => { age=>77 } );
 
         # large objects ok
         $people->insert({ name=>'Bob', cv=>$file->slurp });
 
-        # find_one returns the hash
+        # find_one returns the document
         my $person = $people->find_one({ name=>'joe' });
 
         # or with the id
@@ -119,6 +120,7 @@ They may have a type, called C<edge>, and properties.
 
         # find all edges
         my $rs = $db->relation({ from=>$joe->{id} }); 
+        my $rs = $db->relation({ from=>$joe->{id}, depth=>1 }); 
 
 =head1 DESIGN
 

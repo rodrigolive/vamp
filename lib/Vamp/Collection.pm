@@ -1,7 +1,6 @@
 package Vamp::Collection;
 use Mouse;
 use Try::Tiny;
-use YAML;
 
 has 'name'      => is => 'ro', isa => 'Str',            required => 1;
 has 'db'        => is => 'ro', isa => 'Vamp::Database', required => 1;
@@ -26,6 +25,7 @@ sub insert {
         $self->_rollback( oid=>$oid );
         die "Error inserting: " . shift();
     };
+    return $oid;
 }
 
 sub update {
@@ -40,6 +40,18 @@ sub update {
         $self->_rollback( oid=>$oid );
         die "Error updating: " . shift();
     };
+}
+
+sub upsert {
+    my $self = shift;
+    my $oid = shift;
+    my $data = ref $_[0] eq 'HASH' ? shift : \%{ @_ };
+    if( defined $self->find_one( $oid ) ) {
+        return $self->update( $oid => $data );
+    } else {
+        $data->{id} = $oid;
+        return $self->insert( $data );
+    }
 }
 
 sub find {

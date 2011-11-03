@@ -29,6 +29,7 @@ $people->insert({ name=>'listy', age=>20, belongings=>[qw/house car boat/] });
 {
     my $p = $people->find_one({ name=>'joe' });
     is $p->{age}, 20, 'find_one';
+    ok defined $p->{id}, 'id returned';
 }
 {
     my $rs = $people->find({ age => { '>=', 25 } });
@@ -98,6 +99,14 @@ $people->insert({ name=>'listy', age=>20, belongings=>[qw/house car boat/] });
     $people->update( 'reggie' => { age => 22 } ); 
     my $f = $people->find_one('reggie');
     is $f->{age}, 22, 'update';
+}
+{
+    $people->upsert( 'naomi' => { age => 20 } ); 
+    my $f = $people->find_one('naomi');
+    is $f->{age}, 20, 'upsert';
+    $people->upsert( 'naomi' => { age => 33 } ); 
+    my $f2 = $people->find_one('naomi');
+    is $f2->{age}, 33, 'upsert again';
 }
 
 done_testing;

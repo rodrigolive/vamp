@@ -27,27 +27,14 @@ sub recreate {
     $self->deploy;
 }
 
-# XXX unused
-sub query_find_id {
+sub edge {
     my ($self, %args) = @_;
-    my $db_name = $self->{db_name};
-    my $oids = $self->query("select distinct ${db_name}_obj.id from ${db_name}_obj, ${db_name}_kv
-        where ${db_name}_obj.id=${db_name}_kv.oid and key = ? and value = ?", 
-        $args{k}, $args{v}
-    );
-}
-
-sub query_find_plain {
-    my $self = shift;
-    my $db_name = $self->{db_name};
-    my $query = "select distinct ${db_name}_obj.id from ${db_name}_obj, ${db_name}_kv
-        where ${db_name}_obj.id=${db_name}_kv.oid";
-    my @binds;
-    for my $and ( @_ ) {
-        $query .= " and ( key = ? and value = ? )";
-        push @binds, $and->{k}, $and->{v};
-    }
-    $self->query( $query, @binds );
+    my $table = $self->{db_name} . '_rel';
+    my $from = ref $args{from} ? $args{from}{id} : $args{from};
+    my $to   = ref $args{to} ? $args{to}{id} : $args{to};
+    defined $from or die "Missing or invalid parameter from";
+    defined $to or die "Missing or invalid parameter to";
+    $self->query( qq{INSERT INTO $table (id1,id2) VALUES (?,?)}, $from, $to );
 }
 
 sub drop_collection {
