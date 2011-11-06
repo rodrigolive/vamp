@@ -1,5 +1,5 @@
 package Vamp::Collection;
-use Mouse;
+use Any::Moose;
 use Try::Tiny;
 
 has 'name'      => is => 'ro', isa => 'Str',            required => 1;
@@ -12,6 +12,18 @@ sub drop {
 }
 
 sub insert {
+    my $self = shift;
+    my $first = shift;
+    if( ref $first eq 'ARRAY' ) {
+        my @oids;
+        push @oids, $self->_insert_one( $_, @_ ) for @$first;
+        return @oids;
+    } else {
+        return $self->_insert_one( $first, @_ );
+    }
+}
+
+sub _insert_one {
     my $self = shift;
     my $data = ref $_[0] eq 'HASH' ? shift : \%{ @_ };
     die 'invalid data' unless ref $data eq 'HASH';
@@ -67,20 +79,7 @@ sub find {
 }
 
 *query = \&find;
-
-# this is based on the older oid intersect
-sub find_all {
-    my $self = shift;
-    my $where = ref $_[0] eq 'HASH' ? shift : \%{ @_ };
-    #warn Dump [ $self->_flatten( { age=>[20, 30], name=>{ first=>['joe', 'ana'] } }) ];
-    #warn Dump [ $self->_flatten( $where ) ]; 
-    #TODO need to transmit paging and order to this query
-    my $oids = $self->db->query_find_abs( $where );
-    #TODO need to allow paging here, by reading all oids at once
-    #   $self->db->query_oids( $oids );
-    my @objs = map { $self->_get( $_ ) } @$oids;
-    wantarray ? @objs : \@objs;
-}
+*all   = \&find;
 
 sub get {
     my $self = shift;
@@ -88,11 +87,16 @@ sub get {
     my $rs = Vamp::ResultSet->new( db=>$self->db, query=>$query );
     @_ > 1 ? $rs : $rs->next; 
 }
+
 sub find_one {
     my $self = shift;
-    !ref $_[0]
-        ? $self->get( @_ )
-        : $self->find( @_ )->next;
+    if( @_ > 0 ) {
+        return !ref $_[0]
+            ? $self->get( @_ )
+            : $self->find( @_ )->next;
+    } else {
+        return $self->find->first;
+    }
 }
 
 =head2 insert_from_query

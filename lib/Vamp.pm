@@ -25,6 +25,14 @@ sub connect {
     return $db;
 }
 
+sub _to_ids {
+     map { 
+        ref $_ eq 'HASH'
+        ? $_->{id}
+        : $_;
+    } @_;
+}
+
 =head1 NAME
 
 Vamp - NoSQL Document-Graph DB on top of plain-old DBI
@@ -44,10 +52,11 @@ Vamp - NoSQL Document-Graph DB on top of plain-old DBI
 
 This module mimics the interface and functionality of popular document
 databases such as MongoDB and CouchDB, giving similar functionality
-on top of a standard DBI connection (currently L<DBD::Oracle> only).
+on top of a standard DBI connection
+(currently L<DBD::Oracle> and L<DBD::SQLite>).
 
 The idea is to make it easier to transition
-your app from a SQL backend to a NoSQL one. 
+your app from a SQL backend to a NoSQL one, while keeping the interface. 
 
 =head1 FEATURES
 

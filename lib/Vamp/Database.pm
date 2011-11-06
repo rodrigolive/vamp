@@ -4,17 +4,15 @@ Base class for all backends.
 
 =cut
 package Vamp::Database;
-#use Mouse;
+#use Any::Moose;
 use strict;
-#use Mouse;
 use Try::Tiny;
 use Vamp;
 use Vamp::Util;
 use Vamp::ResultSet;
 use Vamp::Collection;
+use Vamp::Edge;
 use base 'DBIx::Simple' ;
-
-use YAML; # XXX
 
 sub collection {
     my ($self, $collname ) = @_;
@@ -28,13 +26,10 @@ sub recreate {
 }
 
 sub edge {
-    my ($self, %args) = @_;
+    my ($self, $edge_name ) = ( shift, shift );
+    die "missing argument: edge_name" unless defined $edge_name;
     my $table = $self->{db_name} . '_rel';
-    my $from = ref $args{from} ? $args{from}{id} : $args{from};
-    my $to   = ref $args{to} ? $args{to}{id} : $args{to};
-    defined $from or die "Missing or invalid parameter from";
-    defined $to or die "Missing or invalid parameter to";
-    $self->query( qq{INSERT INTO $table (id1,id2) VALUES (?,?)}, $from, $to );
+    return Vamp::Edge->new( db=>$self, edge_name => $edge_name, table_name=>$table );
 }
 
 sub drop_collection {
@@ -83,13 +78,6 @@ sub _quote_keys {
     \%ret;
 }
 
-sub _shorten_keys {
-    my ($self, $hash) = @_;
-    return {} unless ref $hash eq 'HASH' && keys %$hash;
-    my %ret;
-    #$ret{ short($_) } = $hash->{$_} for keys %$hash;
-}
-
 sub _flatten {
     my ($self, $where, $prefix) = @_;
     my @flat;
@@ -126,10 +114,7 @@ sub _flatten {
 
 sub _abstract {
     my ($self,@where) = @_;
-    #warn Dump \@where;
     my ($where,@binds) = $self->abstract->where({ -and => \@where });
-    #warn $where;
-    #warn join ',',@binds;
     return $where, @binds;
 }
 

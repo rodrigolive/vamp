@@ -1,5 +1,5 @@
 package Vamp::Backend::SQLite;
-use Mouse;
+use Any::Moose;
 use Try::Tiny;
 use base 'Vamp::Database';
 use constant DEBUG => Vamp::DEBUG();

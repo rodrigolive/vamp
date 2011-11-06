@@ -19,6 +19,7 @@ my $nums = $db->collection('numbers');
 
 # base data
 $company->insert({ name=>'joe', age=>55 });
+is $company->find_one->{name}, 'joe', 'find_one first';
 $company->insert({ name=>'joe', age=>55 });
 
 $people->insert({ name=>'joe', age=>20 });
@@ -107,6 +108,12 @@ $people->insert({ name=>'listy', age=>20, belongings=>[qw/house car boat/] });
     $people->upsert( 'naomi' => { age => 33 } ); 
     my $f2 = $people->find_one('naomi');
     is $f2->{age}, 33, 'upsert again';
+}
+{
+    my @oids = $people->insert([ { me=>123 }, { me=>234 } ]);
+    is scalar @oids, 2, 'multinsert 2';
+    is $people->find_one( shift @oids )->{me}, 123, 'multinsert fetch 1 ok'; 
+    is $people->find_one( shift @oids )->{me}, 234, 'multinsert fetch 2 ok'; 
 }
 
 done_testing;
