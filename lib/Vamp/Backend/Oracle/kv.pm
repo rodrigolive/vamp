@@ -2,8 +2,9 @@ package Vamp::Backend::Oracle::kv;
 use Any::Moose;
 use Try::Tiny;
 use DBD::Oracle qw(:ora_types);
-use base 'Vamp::Backend::Oracle::Base';
 use constant DEBUG => Vamp::DEBUG();
+
+extends 'Vamp::Backend::Oracle::Base';
 
 sub drop {
     my $self = shift;

@@ -1,29 +1,28 @@
 package Vamp;
-#use Mouse;
+use Any::Moose;
 use strict;
 use warnings;
-use DBIx::Simple;
-use Vamp::Database;
 use Try::Tiny;
 
 use constant DEBUG => $ENV{VAMP_TRACE} || $ENV{VAMP_DEBUG} || 0;
 
-sub connect {
-    my ($self, %args ) = @_;
+sub db {
+    my ( $self, %args ) = @_;
     $args{deploy} //= 1;
-    #my $db = DBIx::Simple->new( @_ );
-    #$db->query( 'select * from vamp_kv' );
-    my @connection = ref $args{args} eq 'ARRAY' ? @{$args{args}} : $args{args}; 
-    my $db = Vamp::Database->new( @connection ); 
-    $db->{driver_name} = $args{backend} || $db->dbh->{Driver}->{Name};
-    my $backend = "Vamp::Backend::$db->{driver_name}";
-    eval "require $backend" or $backend = "Vamp::Backend::Generic";
+
+    # load backend database
+    my $backend = $args{backend} or die "Missing backend";
+
+    # connect to db
+    my $db_class = 'Vamp::Backend::' . $backend;
+
+    #$db_class .= '::Database' unless $backend =~ /::/;
+    eval "require $db_class" or $db_class = "Vamp::Backend::SQLite";
     warn $@ if $@;
-    bless $db, $backend;
-    $db->{db_name} = $args{db} || 'vamp';
+    my $db = $db_class->new( args => $args{args}, db_name => $args{db} || 'vamp' );
     $db->deploy if $args{deploy};
     return $db;
-}
+} 
 
 sub _to_ids {
      map { 

@@ -1,7 +1,10 @@
 package Vamp::Backend::Oracle::Base;
-use strict;
-use warnings;
-use base 'Vamp::Database';
+use Any::Moose;
+use Vamp::Backend::Oracle::Collection;
+use Vamp::Backend::Oracle::Edge;
+use Vamp::Backend::Oracle::ResultSet;
+
+with 'Vamp::DBI::Database';
 
 sub drop_table { 
     my ($self,$table) = @_;

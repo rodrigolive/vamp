@@ -1,8 +1,12 @@
 package Vamp::Backend::SQLite;
 use Any::Moose;
 use Try::Tiny;
-use base 'Vamp::Database';
 use constant DEBUG => Vamp::DEBUG();
+
+use constant collection_class => 'Vamp::Backend::SQLite::Collection';
+use constant edge_class => 'Vamp::Backend::SQLite::Edge';
+
+with 'Vamp::DBI::Database';
 
 sub last_insert_id {
     my $self = shift;
@@ -194,6 +198,25 @@ sub deploy {
             )
         });
     };
+}
+
+{
+    package Vamp::Backend::SQLite::Collection;
+    use Any::Moose;
+    use constant rs_class => 'Vamp::Backend::SQLite::ResultSet';
+    with 'Vamp::DBI::Collection';
+}
+
+{
+    package Vamp::Backend::SQLite::ResultSet;
+    use Any::Moose;
+    with 'Vamp::DBI::ResultSet';
+}
+
+{
+    package Vamp::Backend::SQLite::Edge;
+    use Any::Moose;
+    with 'Vamp::DBI::Edge';
 }
 
 1;
