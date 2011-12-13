@@ -36,5 +36,20 @@ $tags->insert([
     my $edges = $db->edge( 'has_tag' )->find_ids( $first );
     is_deeply $edges, [[1,2],[1,3],[1,4]], 'find_ids';
 }
+{
+    my $people = $db->collection('people');
+    my $id1 = $entries->insert({ name=>'things', author=>'yolanda' });
+    my $id2 = $people->insert({ name=>'lucy' });
+    my $e = $db->edge( 'children' );
+    my $rel = $e->add( $id1 => $id2 );
+    my $rs = $e->find;
+    while( my $r = $rs->next ) {
+        warn ">>>>>" . $r;
+    }
+    #$rel->data( priority=>10 ); 
+    #is_deeply $e->find( $id1 ) => [$id2] => 'found edge child';
+    #ok ! $e->find( 9999 ) => 'not found';
+    
+}
 
 done_testing;

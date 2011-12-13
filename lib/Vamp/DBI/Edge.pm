@@ -1,5 +1,7 @@
 package Vamp::DBI::Edge;
 use Any::Moose 'Role';
+use Carp;
+use namespace::autoclean;
 
 has table_name => is => 'rw', isa => 'Str',            required => 1;
 has rs         => is => 'rw', isa => 'Object';
@@ -36,7 +38,10 @@ sub find_ids {
 sub find {
     my $self = shift;
     $self->_find( @_ );
-    return $self->rs->arrays;
+    #return $self->rs->hashes;
+    #my $rs = $rs_class->new( db=>$self->db, query=>$query );
+    my $rs_class = $self->rs_class;
+    my $rs = $rs_class->new( db=>$self->db, rs=>$self->rs );
 }
 
 sub add {
@@ -53,8 +58,46 @@ sub add {
     return @edges; # edge objects
 }
 
+=head2 delete
+
+Delete edges.
+
+    $edge->delete( $id1 );  # all from id1
+    $edge->delete( undef => $id2 );  # any to id2
+    $edge->delete( undef => $id2,$id3,$id4 );  # any to id2,id3,id4
+    $edge->delete( $id1 => $id2 ); # just this one
+
+=cut
 sub delete {
-    die "Not yet";
+    my ($self, @ids) = @_;
+    carp "Missing id(s) to delete" unless @ids>0; 
+    my ($from, @to ) = @ids;
+    my $table = $self->table_name;
+    if( @to ) {
+        if( defined $to[0] ) {
+            my $places = join ',', ( '?' x @to );
+            $self->db->query( qq{DELETE FROM $table WHERE edge_name=? AND id1=? AND id2 IN ($places)}, $self->edge_name, $from, @to );
+        }
+        else {  # undef => $id1, $id2, $id3
+            shift @to;
+            my $places = join ',', ( '?' x @to );
+            $self->db->query( qq{DELETE FROM $table WHERE edge_name=? AND id2 IN ($places)}, $self->edge_name, @to );
+        }
+    }
+    else {
+        $self->db->query( qq{DELETE FROM $table WHERE edge_name=? AND id1=?}, $self->edge_name, $from );
+    }
+}
+
+=head2 delete_all
+
+Delete all edges of edge type.
+
+=cut
+sub delete_all {
+    my ($self) = @_;
+    my $table = $self->table_name;
+    $self->db->query( qq{DELETE FROM $table WHERE edge_name = ? }, $self->edge_name );
 }
 
 1;

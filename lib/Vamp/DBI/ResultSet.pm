@@ -42,7 +42,7 @@ sub next {
     my @rows;
     my $lastid = $self->lastid;
     push @rows, delete $self->{lastrow} if $self->lastrow;
-    $self->rs( $self->db->query( @{ $self->query } ) ); 
+    $self->rs( $self->db->query( @{ $self->query } ) ) unless ref $self->rs; 
     while( my $r = $self->rs->hash ) {
         my $oid = $r->{oid};
         if( defined $lastid && $oid ne $lastid ) {

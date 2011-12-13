@@ -1,3 +1,8 @@
+tests
+--------------
+export VAMP_TEST_CONNECT=SQLite,dbi:SQLite:test.db
+export VAMP_TEST_CONNECT=Oracle,dbi:Oracle://locahost:1521/SCM
+export VAMP_TEST_CONNECT=Redis,host,localhost,port,6379
 
 
 tables model
@@ -37,3 +42,5 @@ into an array. Requires an unique rowid for ordering (or order by row id)
 - deploy db with "add column" for progressive updating
 - collection storage => clob in obj table or kv ( storage=>'kv', 'obj', 'both' )
 - set operations on array kv fields: set_update( children=>{ -push=>[4,5,6] } )  
+
+

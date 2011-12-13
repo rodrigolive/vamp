@@ -201,6 +201,12 @@ sub deploy {
 }
 
 {
+    package Vamp::Backend::SQLite::ResultSet;
+    use Any::Moose;
+    with 'Vamp::DBI::ResultSet';
+}
+
+{
     package Vamp::Backend::SQLite::Collection;
     use Any::Moose;
     use constant rs_class => 'Vamp::Backend::SQLite::ResultSet';
@@ -208,14 +214,9 @@ sub deploy {
 }
 
 {
-    package Vamp::Backend::SQLite::ResultSet;
-    use Any::Moose;
-    with 'Vamp::DBI::ResultSet';
-}
-
-{
     package Vamp::Backend::SQLite::Edge;
     use Any::Moose;
+    use constant rs_class => 'Vamp::Backend::SQLite::ResultSet';
     with 'Vamp::DBI::Edge';
 }
 

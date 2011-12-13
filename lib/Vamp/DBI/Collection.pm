@@ -2,6 +2,9 @@ package Vamp::DBI::Collection;
 use Any::Moose 'Role';
 use Try::Tiny;
 
+*query = \&find;
+*all   = \&find;
+
 with 'Vamp::Collection';
 
 requires 'rs_class';
@@ -78,9 +81,6 @@ sub find {
     my $rs = $rs_class->new( db=>$self->db, query=>$query );
     return wantarray ? $rs->all : $rs;
 }
-
-*query = \&find;
-*all   = \&find;
 
 sub get {
     my $self = shift;

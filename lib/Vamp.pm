@@ -117,8 +117,17 @@ your app from a SQL backend to a NoSQL one, while keeping the interface.
 Relationships are held in a many-to-many fashion. 
 They may have a type, called C<edge>, and properties.
 
-        # create a relationship
-        my $rel = $db->relation({ from=>$joe->{id}, to=>$bob->{id}, edge=>'friends' });
+        # edge collection (or group)
+        my $edge_group = $db->edge('friends');
+        map { say $_->{from} , $_->{to} } $edge_group->all_nodes;
+
+        # create an edge
+        my $edge = $db->add_edge( $joe->{id} => 'friends' => $bob->{id} );
+        my $edge = $db->edge('friends')->add( $joe->{id} => $bob->{id} ); # ditto
+
+        # edge properties
+        $edge->data( met=>'11/10/1999' );
+        $edge->save;
 
         # delete
         $rel->delete;
@@ -127,7 +136,9 @@ They may have a type, called C<edge>, and properties.
         $rel->insert({ friends_since=>1985 }); 
 
         # find all edges
-        my $rs = $db->relation({ from=>$joe->{id} }); 
+        my $rs = $db->edge('kids');
+        while( my $edge = $rs->next ) {
+            ->add({ from=>$joe->{id} }); 
         my $rs = $db->relation({ from=>$joe->{id}, depth=>1 }); 
 
 =head1 DESIGN
